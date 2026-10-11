@@ -30,7 +30,7 @@ services:
   gateway:
     # build: ./proxy  # local dev: docker compose build gateway
     # CI: dev → trigonaltechnology/gateway:latest | main → :stable
-    image: ${GATEWAY_IMAGE:-trigonaltechnology/gateway:latest}
+    image: ${GATEWAY_IMAGE:-pngnidanehr/gateway:latest}
     ports:
       - "80:80"
       - "443:443"
@@ -68,7 +68,7 @@ services:
   openmrs-backend:
     profiles: ["openmrs","nidanehr-standard"]
     build: ./openmrs
-    image: trigonaltechnology/openmrs-backend:latest
+    image: pngnidanehr/openmrs-backend:latest
     # image: openmrs-backend:local
     # user: root
     container_name: nidan-openmrs-backend
@@ -124,7 +124,7 @@ services:
     #     NIDAN_CALENDAR_BUNDLE: "1.0.0-v9"   # bump after repacking the tgz
     # Vanilla upstream SPA (no BS calendar): dockerfile: Dockerfile.vanilla
     profiles: ["openmrs","nidanehr-standard"]
-    image: trigonaltechnology/openmrs-frontend:latest
+    image: pngnidanehr/openmrs-frontend:latest
     container_name: nidan-openmrs-frontend
     environment:
       - SPA_PATH=/openmrs/spa
@@ -148,7 +148,7 @@ services:
   openmrs-db:
     #image: mariadb:10.11
     profiles: ["openmrs","nidanehr-standard"]
-    image: trigonaltechnology/openmrs-db:latest
+    image: pngnidanehr/openmrs-db:latest
     container_name: nidan-openmrs-db
     # Debezium/CIS: row-based binlog events for wide rows must fit max_allowed_packet (error 1236 if too small).
     command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --log-bin=mysql-bin --binlog_format=ROW --server-id=1 --binlog_row_image=FULL --max-allowed-packet=512M
