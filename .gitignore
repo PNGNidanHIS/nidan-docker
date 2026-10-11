@@ -19,6 +19,7 @@ openelis/volume/properties/TotalSystemConfiguration.properties
 openelis/volume/properties/SystemConfiguration.properties
 openelis/volume/properties/ChangedSystemConfiguration.properties
 openelis/volume/configuration/backend/ocl-checksums.properties
+openelis/volume/configuration/backend/tests-checksums.properties
 
 # Middleware build artifacts (JAR files)
 middleware/*/target/
@@ -30,6 +31,14 @@ middleware/*/target/**
 
 **/.DS_Store
 
+# Python bytecode cache (e.g. superset/__pycache__ from init_superset_metadata.py)
+__pycache__/
+*.py[cod]
+
 gateway-truststore.p12
 gateway.pem
 OpenELIS-Global.war
+.gstack/
+
+# Local dev compose override (host addon binds)
+docker-compose.override.yml

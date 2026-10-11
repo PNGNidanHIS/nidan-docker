@@ -37,6 +37,8 @@ services:
       - "8443:8443"
     environment:
       - GATEWAY_DOMAIN=${GATEWAY_DOMAIN:-localhost}
+      # Extra names for the self-signed cert (comma separated, openssl SAN syntax)
+      - GATEWAY_CERT_SANS=${GATEWAY_CERT_SANS:-}
       - OPENELIS_DOMAIN=${OPENELIS_DOMAIN}
       # OpenELIS context path (must match the backend SERVER_SERVLET_CONTEXT_PATH)
       - OPENELIS_CONTEXT_PATH=${OPENELIS_CONTEXT_PATH:-/api/OpenELIS-Global/}
@@ -64,6 +66,7 @@ services:
   # # OPENMRS
   # # ============================================================================
   openmrs-backend:
+    profiles: ["openmrs","nidanehr-standard"]
     build: ./openmrs
     image: trigonaltechnology/openmrs-backend:latest
     # image: openmrs-backend:local
@@ -85,8 +88,9 @@ services:
       OMRS_CONFIG_HAS_CURRENT_OPENMRS_DATABASE: "true"
       # Debug mode: attach remote debugger on port 5005 (e.g. from IDE) - disable to speed startup
       # OMRS_DEV_DEBUG_PORT: "5005"
-      # JVM: more heap for faster Spring context refresh (many modules = slow bean creation)
-      OMRS_JAVA_MEMORY_OPTS: "-Xmx2g -Xms1g"
+      # Keep enough memory for the OpenMRS module set without exhausting the
+      # 8 GiB Docker VM shared by the rest of the Nidan stack.
+      OMRS_JAVA_MEMORY_OPTS: "${OMRS_JAVA_MEMORY_OPTS:--Xmx1536m -Xms512m -XX:MaxMetaspaceSize=512m}"
       # JVM (optional overrides)
       _JAVA_OPTIONS: "-Dcsrf.enabled=false"
       # Nidan paywall → Odoo payment-status API (read by nidancore via System.getenv;
@@ -110,6 +114,7 @@ services:
       timeout: 10s
       retries: 15
       start_period: 1200s
+    restart: unless-stopped
 
   openmrs-frontend:
     # build:
@@ -118,6 +123,7 @@ services:
     #   args:
     #     NIDAN_CALENDAR_BUNDLE: "1.0.0-v9"   # bump after repacking the tgz
     # Vanilla upstream SPA (no BS calendar): dockerfile: Dockerfile.vanilla
+    profiles: ["openmrs","nidanehr-standard"]
     image: trigonaltechnology/openmrs-frontend:latest
     container_name: nidan-openmrs-frontend
     environment:
@@ -140,7 +146,9 @@ services:
       retries: 3
 
   openmrs-db:
-    image: mariadb:10.11
+    #image: mariadb:10.11
+    profiles: ["openmrs","nidanehr-standard"]
+    image: trigonaltechnology/openmrs-db:latest
     container_name: nidan-openmrs-db
     # Debezium/CIS: row-based binlog events for wide rows must fit max_allowed_packet (error 1236 if too small).
     command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --log-bin=mysql-bin --binlog_format=ROW --server-id=1 --binlog_row_image=FULL --max-allowed-packet=512M
@@ -195,9 +203,10 @@ services:
     # (e.g. trigonaltechnology/nidan_odoo_pro:stable) which bakes the closed-source
     # addons into /mnt/private-addons. No host addon source is mounted in prod.
     # image: ${ODOO_IMAGE:-trigonaltechnology/nidan_odoo:stable}
-    image: trigonaltechnology/nidan_odoo_pro:latest
+    profiles: ["odoo","nidanehr-standard"]
+    image: trigonaltechnology/nidan_odoo:latest
     container_name: nidan-odoo
-    command: sh -c "odoo -d \${ODOO_DB_NAME:-nidan} --proxy-mode --dev=xml -u all"
+    command: ["odoo", "-d", "${ODOO_DB_NAME:-nidan}", "--proxy-mode", "--dev=xml", "-u", "all"]
     ports:
       - "8069:8069"
     environment:
@@ -223,9 +232,10 @@ services:
     volumes:
       - odoo-data:/var/lib/odoo
       # Addons come from the image (baked at /mnt/extra-addons + /mnt/private-addons).
-      # - ${ODOO_ADDONS_PATH}:/mnt/extra-addons:ro
-      # Live-mount the closed-source addons so the current source (not the baked copy) is used.
-      # - ${ODOO_PRIVATE_ADDONS_HOST_PATH}:/mnt/private-addons:ro
+      # No host addon source should be mounted in prod.
+      # - ${ODOO_ADDONS_PATH:-../odoo_19_addons}:/mnt/extra-addons
+      # Mount the private/closed-source addons for live editing in dev
+      # - ${ODOO_PRIVATE_ADDONS_HOST_PATH:-../nidan_odoo_extra_addons}:/mnt/private-addons
       # odoo.conf from git (read-only). Entrypoint copies to container; runtime changes stay in container.
       - ./odoo/odoo.conf:/mnt/odoo.conf.template:ro
     networks:
@@ -241,6 +251,7 @@ services:
       start_period: 60s
 
   odoo-db:
+    profiles: ["odoo","nidanehr-standard"]
     image: postgres:15
     container_name: nidan-odoo-db
     environment:
@@ -266,7 +277,8 @@ services:
   # ORTHANC
   # ============================================================================
   orthanc:
-    image: orthancteam/orthanc:latest
+    profiles: ["orthanc","nidanehr-standard"]
+    image: orthancteam/orthanc:26.6.0
     container_name: nidan-orthanc
     ports:
       - "8042:8042" # HTTP/REST API
@@ -320,6 +332,7 @@ services:
       start_period: 30s
 
   orthanc-db:
+    profiles: ["orthanc","nidanehr-standard"]
     image: postgres:15
     container_name: nidan-orthanc-db
     environment:
@@ -371,7 +384,9 @@ services:
 
   # OpenELIS backend (Tomcat) - FIXED with HTTP enabled
   openelis:
+    profiles: ["openelis","nidanehr-standard"]
     image: trigonaltechnology/openelis-global-2:latest
+    platform: linux/amd64
     container_name: nidan-openelis
     ports:
       - "8083:8080"
@@ -381,8 +396,27 @@ services:
     environment:
       - DEFAULT_PW=${OPENELIS_DEFAULT_ADMIN_PASSWORD:-adminADMIN!}
       - TZ=${OPENELIS_TZ:-UTC}
-      # Database connection
-      - CATALINA_OPTS=-Ddatasource.url=jdbc:postgresql://openelis-db:5432/clinlims -Ddatasource.username=clinlims -Ddatasource.password=${OPENELIS_DB_PASSWORD:-changeme}
+      # JVM system properties injected into Tomcat via CATALINA_OPTS.
+      # Each -D flag maps 1:1 to a property key in common.properties.
+      # Groups: database | middleware sync | nidan test order | nidan paywall | nidan cis retry
+      - CATALINA_OPTS=
+          -Ddatasource.url=jdbc:postgresql://openelis-db:5432/clinlims
+          -Ddatasource.username=clinlims
+          -Ddatasource.password=${OPENELIS_DB_PASSWORD:-changeme}
+          -Dorg.openelisglobal.middleware.test.sync.enabled=${OPENELIS_MIDDLEWARE_TEST_SYNC_ENABLED:-false}
+          -Dorg.openelisglobal.middleware.test.sync.url=${CIS_BASE_URL:-http://nidan-cis:8081}/openelis/catalog/lab-test-definition
+          -Dorg.openelisglobal.middleware.test.sync.secret=${OPENELIS_MIDDLEWARE_SYNC_SECRET:-change-me}
+          -Dorg.openelisglobal.middleware.result.sync.enabled=${OPENELIS_MIDDLEWARE_RESULT_SYNC_ENABLED:-true}
+          -Dorg.openelisglobal.middleware.result.sync.url=${CIS_BASE_URL:-http://nidan-cis:8081}/openelis/lab-result
+          -Dorg.openelisglobal.middleware.result.sync.secret=${OPENELIS_MIDDLEWARE_SYNC_SECRET:-change-me}
+          -Dorg.openelisglobal.nidan.testorder.enabled=${OPENELIS_NIDAN_TESTORDER_ENABLED:-true}
+          -Dorg.openelisglobal.nidan.testorder.url=${CIS_BASE_URL:-http://nidan-cis:8081}/openelis/sample-collected
+          -Dorg.openelisglobal.nidan.paywall.enabled=${OPENELIS_NIDAN_PAYWALL_ENABLED:-true}
+          -Dorg.openelisglobal.nidan.paywall.odoo.url=${NIDANCORE_ODOO_URL:-http://odoo:8069}
+          -Dorg.openelisglobal.nidan.paywall.odoo.secret=${NIDAN_ODOO_SECRET}
+          -Dorg.openelisglobal.nidan.paywall.insurance.bypass=${OPENELIS_NIDAN_PAYWALL_INSURANCE_BYPASS:-true}
+          -Dorg.openelisglobal.nidan.cisretry.list.url=${CIS_BASE_URL:-http://nidan-cis:8081}/api/dead-letters
+          -Dorg.openelisglobal.nidan.cisretry.retry.url=${CIS_BASE_URL:-http://nidan-cis:8081}/api/dead-letters/retry
       # Disable Odoo integration
       - ODOO_ENABLED=false
       - ORG_OPENELISGLOBAL_ODOO_ENABLED=false
@@ -394,6 +428,7 @@ services:
       - ./openelis/tomcat/server.xml:/usr/local/tomcat/conf/server.xml:ro
       - openelis-properties:/var/lib/openelis-global/properties
       - ./openelis/volume/configuration:/var/lib/openelis-global/configuration
+      - ./openelis/volume/branding:/var/lib/openelis-global/branding
       - ./openelis/volume/plugins:/var/lib/openelis-global/plugins
       - ./openelis/volume/ocl:/var/lib/openelis-global/ocl
       - ./openelis/volume/logs/oeLogs:/var/lib/openelis-global/logs
@@ -413,6 +448,7 @@ services:
 
   # OpenELIS Frontend
   openelis-frontend:
+    profiles: ["openelis","nidanehr-standard"]
     image: trigonaltechnology/openelis-global-2-frontend:latest
     container_name: nidan-openelis-frontend
     platform: linux/amd64
@@ -430,6 +466,7 @@ services:
   # NIDAN INTEGRATION MIDDLEWARE (Kafka + Postgres + CIS/OIS)
   # ============================================================================
   nidan-integration-db:
+    profiles: ["middleware","nidanehr-standard"]
     image: postgres:15
     container_name: nidan-integration-db
     environment:
@@ -448,6 +485,7 @@ services:
 
   # Zookeeper for Kafka (Confluent images)
   nidan-zookeeper:
+    profiles: ["middleware","nidanehr-standard"]
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: nidan-zookeeper
     environment:
@@ -465,6 +503,7 @@ services:
     restart: unless-stopped
 
   nidan-kafka:
+    profiles: ["middleware","nidanehr-standard"]
     image: confluentinc/cp-kafka:7.5.0
     container_name: nidan-kafka
     environment:
@@ -500,14 +539,8 @@ services:
       start_period: 45s
     restart: unless-stopped
 
-  # CIS / OIS: build from ../nidan-middleware/integration (Maven runs in Docker).
-  #   docker compose build nidan-cis nidan-ois
-  #   docker compose up --build nidan-cis nidan-ois
-  # Set NIDAN_CIS_IMAGE / NIDAN_OIS_IMAGE to registry tags to use prebuilt images without local build.
   nidan-cis:
-    # build:
-    #   context: ../nidan-middleware/integration
-    #   dockerfile: Dockerfile.cis
+    profiles: ["middleware","nidanehr-standard"]
     image: ${NIDAN_CIS_IMAGE:-nidan-cis:local}
     container_name: nidan-cis
     ports:
@@ -554,8 +587,18 @@ services:
       - OPENMRS_BASE_URL=${OPENMRS_BASE_URL:-http://openmrs-backend:8080/openmrs}
       - OPENMRS_USERNAME=${OPENMRS_USERNAME:-admin}
       - OPENMRS_PASSWORD=${OPENMRS_PASSWORD:-Admin123}
+      # Sync-account provisioning (CIS creates the account in OpenMRS + OpenELIS on startup).
+      # NIDAN_SYNC_* = the account CIS authenticates as; OPENMRS_ADMIN_* = real admin used only to create it.
+      - NIDAN_SYNC_USERNAME=${NIDAN_SYNC_USERNAME:-nidan-sync}
+      - NIDAN_SYNC_PASSWORD=${NIDAN_SYNC_PASSWORD:-}
+      - OPENMRS_ADMIN_USERNAME=${OPENMRS_ADMIN_USERNAME:-admin}
+      - OPENMRS_ADMIN_PASSWORD=${OPENMRS_ADMIN_PASSWORD:-Admin123}
       - OPENMRS_IDENTIFIER_TYPE_UUID=${OPENMRS_IDENTIFIER_TYPE_UUID:-05a29f94-c0ed-11e2-94be-8c13b969e334}
       - OPENMRS_DEFAULT_LOCATION_UUID=${OPENMRS_DEFAULT_LOCATION_UUID:-44c3efb0-2583-4c80-a79e-1f756a03c0a1}
+      # Encounter type for order-less (Odoo-billed / walk-in) lab results ingested from OpenELIS
+      - OPENMRS_LAB_RESULTS_ENCOUNTER_TYPE_UUID=${OPENMRS_LAB_RESULTS_ENCOUNTER_TYPE_UUID:-3596fafb-6f6f-4396-8c87-6e63a0f1bd71}
+      # Concept set whose members are orderable lab tests in O3; catalog sync adds new tests to it
+      - OPENMRS_LAB_ORDERABLES_CONCEPT_SET_UUID=${OPENMRS_LAB_ORDERABLES_CONCEPT_SET_UUID:-1748a953-d12e-4be1-914c-f6b096c6cdef}
       - OPENMRS_FHIR_EXTENSION_URL=${OPENMRS_FHIR_EXTENSION_URL:-http://fhir.openmrs.org/ext/patient/identifier#location}
       # Orthanc
       - ORTHANC_ENABLED=${ORTHANC_ENABLED:-true}
@@ -580,6 +623,12 @@ services:
       # - OPENELIS_ORDER_BUNDLE_PATH=${OPENELIS_ORDER_BUNDLE_PATH:-/fhir/tasks}
       - OPENELIS_USERNAME=${OPENELIS_USERNAME:-admin}
       - OPENELIS_PASSWORD=${OPENELIS_PASSWORD:-adminADMIN!}
+      # OpenELIS DB — CIS seeds the sync account directly (OpenELIS has no user REST API)
+      - OPENELIS_DB_HOST=${OPENELIS_DB_HOST:-nidan-openelis-db}
+      - OPENELIS_DB_PORT=${OPENELIS_DB_PORT:-5432}
+      - OPENELIS_DB_NAME=${OPENELIS_DB_NAME:-clinlims}
+      - OPENELIS_DB_USER=${OPENELIS_DB_USER:-clinlims}
+      - OPENELIS_DB_PASSWORD=${OPENELIS_DB_PASSWORD:-clinlims}
       #- "JAVA_TOOL_OPTIONS=-Djavax.net.ssl.trustStore=/etc/ssl/certs/openelis-truststore.p12 -Djavax.net.ssl.trustStorePassword=openelisTrust123"
       # Integration
       - INTEGRATION_SOURCE_SYSTEM=${INTEGRATION_SOURCE_SYSTEM:-CIS}
@@ -591,13 +640,16 @@ services:
       - INTEGRATION_FLOW_RADIOLOGY_POS_ENABLED=${INTEGRATION_FLOW_RADIOLOGY_POS_ENABLED:-true}
       - INTEGRATION_FLOW_LAB_OPENELIS_ENABLED=${INTEGRATION_FLOW_LAB_OPENELIS_ENABLED:-true}
       - INTEGRATION_FLOW_LAB_POS_ENABLED=${INTEGRATION_FLOW_LAB_POS_ENABLED:-true}
+      # OpenELIS → OpenMRS result ingestion. Set to false for lab+billing-only deployments
+      # (no OpenMRS); defaults to OPENMRS_ENABLED so it auto-disables when OpenMRS is absent.
+      - INTEGRATION_FLOW_LAB_RESULTS_OPENMRS_ENABLED=${INTEGRATION_FLOW_LAB_RESULTS_OPENMRS_ENABLED:-${OPENMRS_ENABLED:-true}}
       - INTEGRATION_FLOW_DEBEZIUM_PUBLISH_ORDERS_LAB_ENABLED=${INTEGRATION_FLOW_DEBEZIUM_PUBLISH_ORDERS_LAB_ENABLED:-true}
       - INTEGRATION_FLOW_DEBEZIUM_PUBLISH_ORDERS_RADIOLOGY_ENABLED=${INTEGRATION_FLOW_DEBEZIUM_PUBLISH_ORDERS_RADIOLOGY_ENABLED:-true}
       # Debezium Embedded (CIS)--var control for debezium
       - DEBEZIUM_ENABLED=${DEBEZIUM_ENABLED:-false}
       - DEBEZIUM_DB_USER=${DEBEZIUM_DB_USER:-root}
       - DEBEZIUM_DB_PASSWORD=${DEBEZIUM_DB_PASSWORD:-root}
-      - DEBEZIUM_TABLE_INCLUDE_LIST=${DEBEZIUM_TABLE_INCLUDE_LIST:-openmrs.orders,openmrs.drug_order,openmrs.person,openmrs.person_name,openmrs.patient_identifier,openmrs.bed_type,openmrs.bed_patient_assignment_map}
+      - DEBEZIUM_TABLE_INCLUDE_LIST=${DEBEZIUM_TABLE_INCLUDE_LIST:-openmrs.orders,openmrs.drug_order,openmrs.person,openmrs.person_name,openmrs.patient_identifier,openmrs.bed_type,openmrs.bed_patient_assignment_map,openmrs.location,openmrs.provider,openmrs.provider_attribute}
       # Kafka retry topics (opt-in via @KafkaRetryable)
       - INTEGRATION_KAFKA_RETRY_ENABLED=${INTEGRATION_KAFKA_RETRY_ENABLED:-false}
       - INTEGRATION_KAFKA_RETRY_ATTEMPTS=${INTEGRATION_KAFKA_RETRY_ATTEMPTS:-5}
@@ -628,6 +680,7 @@ services:
       start_period: 60s
 
   nidan-ois:
+    profiles: ["middleware","nidanehr-standard"]
     image: ${NIDAN_OIS_IMAGE:-nidan-ois:local}
     container_name: nidan-ois
     ports:
@@ -657,6 +710,9 @@ services:
       - ODOO_DATABASE=${ODOO_DB_NAME:-nidan}
       - ODOO_USERNAME=${ODOO_USERNAME:-nidan}
       - ODOO_PASSWORD=${ODOO_PASSWORD:-nidan}
+      # Sync-account provisioning (OIS creates the account in Odoo on startup, via JSON-RPC)
+      - NIDAN_SYNC_USERNAME=${NIDAN_SYNC_USERNAME:-nidan-sync}
+      - NIDAN_SYNC_PASSWORD=${NIDAN_SYNC_PASSWORD:-}
       # Integration
       - OIS_WEBHOOK_SECRET=${OIS_WEBHOOK_SECRET:-sample}
       - SKIP_SOURCE_SYSTEMS_FOR_ODOO=${SKIP_SOURCE_SYSTEMS_FOR_ODOO:-ODOO}
@@ -700,6 +756,7 @@ services:
   # DHIS2 / FEDERAL HMIS INTEGRATION
   # ============================================================================
   nidan-dhis2-db:
+    profiles: ["dhis2","nidanehr-standard"]
     image: mysql:8.0
     container_name: nidan-dhis2-db
     environment:
@@ -719,6 +776,7 @@ services:
     restart: unless-stopped
 
   nidan-dhis2:
+    profiles: ["dhis2","nidanehr-standard"]
     image: trigonaltechnology/nidan-dhis2-integration:latest
     container_name: nidan-dhis2
     ports:
@@ -790,6 +848,7 @@ services:
   # APACHE SUPERSET
   # ============================================================================
   superset:
+    profiles: ["superset","nidanehr-standard"]
     build: ./superset
     image: ${SUPERSET_IMAGE:-trigonaltechnology/superset:latest}
     container_name: nidan-superset
@@ -797,6 +856,8 @@ services:
       - "8088:8088" # Keep for direct access during debugging, remove in production
     environment:
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+      SUPERSET_ADMIN_USERNAME: ${SUPERSET_ADMIN_USERNAME:-admin}
+      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
       SUPERSET_LOAD_EXAMPLES: ${SUPERSET_LOAD_EXAMPLES:-no}
       PYTHONPATH: /app/pythonpath
 
@@ -804,8 +865,15 @@ services:
       SUPERSET_WEBSERVER_ADDRESS: '0.0.0.0'
       SUPERSET_WEBSERVER_PORT: '8088'
 
-      # Tell Superset it's behind a reverse proxy at /superset/
-      SCRIPT_NAME: /superset
+      # Tell Superset it's behind a reverse proxy at /superset/.
+      # Use SUPERSET_APP_ROOT (Superset 6 AppRootMiddleware), NOT the legacy
+      # gunicorn SCRIPT_NAME env: with SCRIPT_NAME set, gunicorn strips
+      # "/superset" and then AppRootMiddleware (active because APPLICATION_ROOT
+      # = /superset) tries to strip it again, so every /superset/* route 404s.
+      # SUPERSET_APP_ROOT drives the app prefix AND the base-image healthcheck
+      # (curl http://localhost:$SUPERSET_PORT/$SUPERSET_APP_ROOT/health).
+      SUPERSET_APP_ROOT: /superset
+      SUPERSET_PORT: '8088'
       # Fix health check path issue
       SUPERSET_HEALTH_CHECK_ENDPOINT: /health
 
@@ -840,6 +908,8 @@ services:
       - superset-home:/app/superset_home
       - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
       - ./superset/init_superset_metadata.py:/app/pythonpath/init_superset_metadata.py:ro
+      - ./superset/pager.js:/app/pythonpath/pager.js:ro
+      - ./superset/scroller.js:/app/pythonpath/scroller.js:ro
       - ./superset/docker-entrypoint.sh:/app/docker-entrypoint.sh:ro
       - ./superset/metadata:/app/superset_metadata:ro
     restart: unless-stopped

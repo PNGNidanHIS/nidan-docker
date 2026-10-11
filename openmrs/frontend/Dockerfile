@@ -5,7 +5,7 @@
 #--------------------------------------------
 FROM --platform=$BUILDPLATFORM node:22-alpine as dev
 
-ARG APP_SHELL_VERSION=next
+ARG APP_SHELL_VERSION=10.0.0
 # Bump after repacking nidan-esm-nepali-calendar-1.0.0.tgz to bust docker layer cache.
 ARG NIDAN_CALENDAR_BUNDLE=1.0.0-v9
 
@@ -30,6 +30,8 @@ COPY packages/nidan-esm-nepali-calendar-1.0.0.tgz .
 COPY packages/openmrs-esm-form-builder-app-3.4.1-trigonal.tgz .
 COPY packages/openmrs-esm-form-engine-app-12.1.0-trigonal.tgz .
 COPY packages/openmrs-esm-service-queues-app-10.0.2.tgz .
+COPY packages/openmrs-esm-paywall-app-1.0.0.tgz .
+COPY packages/openmrs-esm-login-app-10.0.0-nidan.tgz .
 
 # Nidan patient-chart fork (@openmrs/esm-patient-chart 12.1.0 + extensions)
 COPY packages/openmrs-esm-patient-chart-app-12.1.0.tgz .
@@ -38,6 +40,9 @@ COPY packages/openmrs-esm-patient-orders-app-12.1.0.tgz .
 COPY packages/openmrs-esm-orderset-app-12.0.1.tgz .
 COPY packages/openmrs-esm-patient-orders-fast-app-12.0.1.tgz .
 COPY packages/openmrs-esm-patient-medications-app-12.1.0-trigonal.tgz .
+COPY packages/openmrs-esm-patient-notes-app-12.1.0.tgz .
+COPY packages/openmrs-esm-appointments-app-10.0.2.tgz .
+COPY packages/openmrs-esm-odontogram-app-1.0.0.tgz .
 
 RUN yarn add ./trigonal-esm-patient-report-app-1.0.0.tgz
 RUN yarn add ./trigonal-esm-ipd-app-1.0.0.tgz
@@ -48,12 +53,16 @@ RUN yarn add ./kenyaemr-esm-procedure-orders-app-4.0.5.tgz
 RUN yarn add ./kenyaemr-esm-medical-supply-orders-app-4.0.5.tgz
 RUN yarn add ./kenyaemr-esm-bed-orders-app-4.0.5.tgz
 RUN yarn add ./openmrs-esm-nidan-core-app-1.0.0.tgz
+RUN yarn add ./openmrs-esm-paywall-app-1.0.0.tgz
+RUN yarn add ./openmrs-esm-patient-notes-app-12.1.0.tgz
+RUN yarn add ./openmrs-esm-login-app-10.0.0-nidan.tgz
+RUN yarn add ./openmrs-esm-odontogram-app-1.0.0.tgz
 
 RUN echo "nidan-calendar-bundle=${NIDAN_CALENDAR_BUNDLE}" && \
     yarn add ./nidan-esm-nepali-calendar-1.0.0.tgz
 
 # openmrs CLI must live in /app/node_modules (not npx cache) so patches apply to the same tree `openmrs build` uses.
-RUN yarn add openmrs@${APP_SHELL_VERSION:-next} --legacy-peer-deps
+RUN yarn add openmrs@${APP_SHELL_VERSION:-10.0.0} --legacy-peer-deps
 RUN yarn add ./openmrs-esm-form-builder-app-3.4.1-trigonal.tgz
 RUN yarn add ./openmrs-esm-form-engine-app-12.1.0-trigonal.tgz
 RUN yarn add ./openmrs-esm-service-queues-app-10.0.2.tgz
@@ -63,6 +72,7 @@ RUN yarn add ./openmrs-esm-patient-orders-app-12.1.0.tgz
 RUN yarn add ./openmrs-esm-orderset-app-12.0.1.tgz
 RUN yarn add ./openmrs-esm-patient-orders-fast-app-12.0.1.tgz
 RUN yarn add ./openmrs-esm-patient-medications-app-12.1.0-trigonal.tgz
+RUN yarn add ./openmrs-esm-appointments-app-10.0.2.tgz
 
 RUN yarn openmrs assemble --manifest --mode config --config spa-assemble-config.json --target ./spa
 
@@ -95,5 +105,9 @@ COPY nginx.conf /etc/nginx/nginx.conf
 
 COPY --from=dev /app/spa /usr/share/nginx/html
 COPY config-core_demo.json /usr/share/nginx/html
+
+COPY /resources/favicon.ico /usr/share/nginx/html/favicon.ico
+COPY /resources/nidan-logo-full.png /usr/share/nginx/html
+COPY /resources/nidan-logo-white.png /usr/share/nginx/html
 
 CMD ["/usr/local/bin/startup.sh"]
