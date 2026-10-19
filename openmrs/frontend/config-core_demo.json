@@ -153,7 +153,7 @@
     "Brand color #3": "#0082A8",
     "Brand color #1": "#006D8F",
     "Brand color #2": "#003B5C",
-    "implementationName": "NidanEHR"
+    "implementationName": "PNG HIS"
   },
   "@kenyaemr/esm-imaging-orders-app": {
     "radiologyConceptSetUuid": "cd9f116c-517d-439e-847d-d8d257434083",
@@ -412,13 +412,13 @@
       }
     },
     "logo": {
-      "src": "${openmrsSpaBase}/nidan-logo-white.png",
-      "alt": "NidanEHR"
+      "src": "${openmrsSpaBase}/PNG_HIS_logo.png",
+      "alt": "PNG HIS"
     }
   },
   "@openmrs/esm-login-app": {
     "logo": {
-      "src": "${openmrsSpaBase}/nidan-logo-full.png",
+      "src": "${openmrsSpaBase}/PNG_HIS_logo.png",
       "alt": "Logo"
     }
   }
