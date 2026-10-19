@@ -51,7 +51,7 @@ services:
       - certbot-www:/var/www/certbot
       - ./proxy/nginx.conf:/etc/nginx/nginx.conf.template:ro
       - ./proxy/index.html.template:/etc/nginx/templates/index.html.template:ro
-      - ./proxy/nidan-logo.png:/usr/share/nginx/html/nidan-logo.png:ro
+      - ./proxy/PNG_HIS_logo.png:/usr/share/nginx/html/PNG_HIS_logo.png:ro
       - ./proxy/trigonal-logo.png:/usr/share/nginx/html/trigonal-logo.png:ro
       - ./proxy/502.html:/usr/share/nginx/html/502.html:ro
     healthcheck:

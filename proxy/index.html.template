@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>NidanEHR Services Portal</title>
+  <title>PNG HIS Services Portal</title>
   <style>
     /* ==========================================================================
        1. Global Styles & CSS Variables
@@ -420,7 +420,7 @@
       
       <!-- Side-by-Side Centered Header -->
       <header class="header">
-        <img src="/assets/images/nidan-logo.svg" alt="NidanEHR Logo" class="brand-logo">
+        <img src="/assets/images/PNG_HIS_logo.png" alt="PNG HIS Logo" class="brand-logo">
           <!--<div class="header-content">
         <div class="header-title">Lumbini Province Government</div>
           <div class="header-sub">Ministry of Health</div>
@@ -432,7 +432,7 @@
 
       <!-- Hero Section (Hidden on screens <= 12 inches) -->
       <div class="hero-container">
-        <h1 class="hero-title">Welcome to NidanEHR Services Portal</h1>
+        <h1 class="hero-title">Welcome to PNG HIS Services Portal</h1>
       </div>
 
       <!-- Grid of Services -->
@@ -463,6 +463,7 @@
           <h2 class="card-title">Laboratory Information System</h2>
         </a>
 
+        <!--
         <a href="/orthanc-container/ui/app/index.html#/" target="_blank" class="card" id="card-orthanc">
           <div class="status-badge status-checking" id="status-orthanc">Checking...</div>
           <div class="icon-wrapper">
@@ -470,6 +471,7 @@
           </div>
           <h2 class="card-title">Radiology & Diagnostic Imaging</h2>
         </a>
+        -->
 
         <!-- Row 2: Cards 5 to 7 -->
         <a href="/cis/dead-letters/index.html" target="_blank" class="card" id="card-cis">
@@ -528,7 +530,8 @@
             <strong>Trigonal Technology</strong>
           </a>
         </span>
-        <span class="copyright-text">© 2026 NidanEHR. All rights reserved.</span>
+        <span class="copyright-text">Built for PNG, powered by open source.</span>
+        <span class="copyright-text">© 2026 PNG HIS. All rights reserved.</span>
       </div>
 
     </div>
