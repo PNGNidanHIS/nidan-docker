@@ -416,7 +416,7 @@
       "alt": "PNG HIS"
     }
   },
-  "@openmrs/esm-patient-immunizations-app":{
+  "@openmrs/esm-patient-immunizations-app": {
     "immunizationFormUuid": "ca4b1f79-a648-31de-996f-f47ced6a1394"
   }, 
   "@openmrs/esm-login-app": {
