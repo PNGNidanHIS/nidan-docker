@@ -31,7 +31,7 @@
     "@openmrs/esm-patient-conditions-app": "12.1.1-pre.11327",
     "@openmrs/esm-patient-flags-app": "12.1.1-pre.11327",
     "@openmrs/esm-patient-forms-app": "openmrs-esm-patient-forms-app-12.1.0.tgz",
-    "@openmrs/esm-patient-immunizations-app": "12.1.1-pre.11327",
+    "@openmrs/esm-patient-immunizations-app": "openmrs-esm-patient-immunizations-app-12.1.0.tgz",
     "@openmrs/esm-patient-label-printing-app": "12.1.1-pre.11327",
     "@openmrs/esm-patient-list-management-app": "10.0.2",
     "@openmrs/esm-patient-lists-app": "12.1.1-pre.11327",
